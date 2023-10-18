@@ -1,0 +1,138 @@
+jądro Linuxa (inaczej niż inne systemu) reprezentuja procesy jako zadania - task_struct. Proces jednoatkowy jest reprezentowany jako jedno zadanie a wielo jako wiele.
+
+Dla każdego procesu składowany jest w pamięci deskryptor procesu służący do zarządania procesami przez jądro (struktura zadania opisuje stan procesu a deksryptor juz nie bardzo). Deskryptor jest tworzony w ramach instrukcji tworzącej sam proces.
+
+Jądro składuje deksryptory wszsytkich procesów na liscie dwukierunkowej. PID można odwzorować na address struktury zadania tego procesu.
+
+deskryptor procesu (task_struct) zawiera:
+- info wykorzystywane przez planiste (czas na procesorze, wywłaszeń itd)
+- obraz pamięci - wskaźniki do segmentu tekstu, danych i stosu lub tablice stron (info gdzie znalexc skladniki skladowe na dysku)
+- info o sygnałach czyli maski itd.
+- rejestry maszynowe - w razie wykonywania przez jądro płapki tutaj zapisywany jest konstekst procesora
+- Stan wywołania systemowego ?
+- Tablica deskryptorów plików
+- Rozliczenia - też info o czasach
+- Stos jądra 
+- Różne
+
+zad 2
+
+przekierowanie - przekierowuje stdout procesu na początek pliku
+
+Potok - jest rodzajem pseudopliku, który można wykorzystać do połączenia dwóch procesów. Jeśli procesy A i B chcą się ze sobą komunikować przez potok, muszą go wcześniej ustanowić. Kiedy proces A chce przesłać
+dane do procesu B, zapisuje informacje w potoku tak, jakby był on plikiem wynikowym. W rzeczywistości implementacja potoku bardzo przypomina implementację pliku. Proces B może
+czytać dane poprzez czytanie potoku w taki sposób, jakby był to plik wejściowy. Tak więc komunikacja między procesami w Uniksie wygląda bardzo podobnie do standardowych operacji odczytu
+i zapisu plików.
+
+LINUX
+(
+- struktura zdania wraz z deskryptorem nowego i razem z nim stos jądra, strutura thread_info i jakies inne rzeczy. Struktury w większości wypełniane są na podstawie procesu macierzystego
+- Proces potomny otrzymuje identyfikator PID, własną mapę pamięci oraz współdzielony dostęp do plików swojego rodzica. Zaraz potem ustawia się rejestry nowego procesu
+- generalnie segmnet tekstu nie zostaje przepisany, zamaist tego jest wspoldzielony bo jest read-only ale tak na serio wszsytko jest wspoldzielone dopóty dopóki nowy proces nie bedzie chciał czego zmodyfikować. W takim wypadku tworzona jest kopia strony pmaięci dawana jest już z naeżytymi prawami dostępu nowu procesowi
+) (nowy proces ma swoja talbice ston ale strony nie sa skladodwany, skladuje je na bierzaco powodujac bledy stron)
+
+fork i execv:
+-wywołanie przechodzi w tryb jądra
+
+-przydzelenie pamięci dla struktury zadania procesu potomnego
+-wypełnienie struktury zadania potomnego danymi procesu rodzica
+-przydzielenie pamięci dla stosu i przestrzeni użytkownika procesu potonego
+-przydzielenie PID 
+-Określenie że tekst ma by wspóldzielony
+-kopiuje tablice stron dla danych i stosu
+-określenie że otwarte pliki mają być współdzielone
+
+- następuję powrót do procesu ( w końcu też do dziecka)
+- wywolanie execv(nazwa polecenia, argumenty do niego, zmienne srodowiskowy/0)
+
+-wywołanie przechodzi w tryb jądra
+
+-odnajduje program wykonywalny
+-sprawdza uprawdenia
+-odczytuje i weryfukuje naglowek
+-kopiuje argumenty i lansuchy srodowiskowe do jadra
+-zwalnia stara prezstrzen adresowa (OBRAZ PAMIEC!!!!)
+-przydziela nowa (ORAZ PAMIECI!!!!)
+-kopiuje zmienne i lancuchy srodowiskowe na stos
+-zeruje sygnaly
+-inicjalizuje rejestry
+
+WinNT
+
+- w trybie uzytkownika wywolywane jest CreateProcess  znazwa pliku
+- CreateProcess  gromadzi parametry do stworzenia procesu i przekazuje je NtCreateUserProcess, kotre wykonywane jest w trybie jadra
+- zostaje stworzony zupełnie nowy proces a nie kopia jak w linuxie.
+(Stworzony proces nie otrzymuje kopii pamięci swojego rodzica CreateProcess można w pewien sposób porównać do połączenia fork z execve.)
+
+Procesor CPU np. może być wyposażony w oddzielne jednostki do pobierania, dekodowania i uruchamiania instrukcji. Dzięki temu, kiedy procesor uruchamia instrukcję n, może w tym samym czasie dekodować instrukcję n+1 i pobierać instrukcję n+2. Taka organizacja nosi nazwę potoku.
+
+
+
+wywołanie naraz połączonego wywołania fork()+execve() jako spawn() pozbawia nas mozliwości wprowadzania zmian pomiędzy wywołaniami fork i execve
+
+OSTATNEI PYTANIE!!!!!!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+zad 1
+
+
+stan procesu - stan dzialania procesów, monitorowanie i zarządzanie działaniem procesów w systemie.
+
+zablokowanie sygnalu - zapalenie bitu w masce blokujacej sygnaly (chyba w deskryptorze prescesu)
+
+zignorowanie sygnalu - za pomoca funckji sigaction nalezy ustawic obsluzenie sygnalu funkcja, ktora nic nie robi
+
+sen przerywalny - może być przerwany, co oznacza, że może reagować na sygnały i kontynuować swoje działanie. Stan ten jest oznaczany literą "S" - rocesy w stanie przerywalnym często oczekują na zdarzenia wejścia/wyjścia, takie jak odczytanie danych z dysku twardego, pobranie danych z sieci lub oczekiwanie na dane z urządzenia wejścia/wyjścia. Procesy w stanie przerywalnym są aktywne i mogą być wznowione po zakończeniu operacji wejścia/wyjścia lub po otrzymaniu odpowiedniego sygnału.
+
+sen nieprzerywalny - Procesy w stanie nieprzerywalnym zazwyczaj reprezentują operacje wejścia/wyjścia, które wymagają dostępu do urządzeń blokujących lub operacje związane z systemem plików, na przykład synchronizację metadanych na dysku. Jeśli taki proces napotka problem lub błąd, który utknął go w stanie nieprzerywalnym, może to prowadzić do konieczności restartowania systemu lub ręcznego zrestartowania procesu, co jest zazwyczaj ostatecznością. Proces w stanie nieprzerywalnym jest w stanie usypienia, ale nie może być przerwany przez standardowe sygnały, takie jak SIGINT (Ctrl+C) czy SIGTERM. Stan ten jest oznaczany literą "D" w wynikach polecenia ps
+
+
+
+The signals SIGKILL and SIGSTOP cannot be caught, blocked, or ignored - no wiec SIGSEGV mozna dotykac
+(po zignorowaniu SIGSEGV zapetlamy sie bo nie idziemy do nastenej istrukcji tylko do tej samej)
+ 
+---
+Stopped - proces został zatrzymany i można go wznowić tylko poprzez pozytywne działanie innego procesu. Na przykład debugowany proces można ustawić w stan zatrzymania do momentu otrzymania sygnału SIGCONT.
+
+RUNNING STATE
+Ready - proces załadowany do pamięci, czeka na przydzielenie czasu CPU przez scheduler
+Executing -  proces wykonywany przez CPU
+
+Zombie -  proces zakończony, ale nie pogrzebany
+
+Uninteraptible - est to stan zablokowany. W stanie nieprzerywalnym proces oczekuje bezpośrednio na warunki sprzętowe i dlatego nie będzie obsługiwał żadnych sygnałów poza dwoma - najczęściej dostępu do dysku np. mkdir 
+Interaptixble - jest to stan zablokowany, w którym proces oczekuje na zdarzenie, takie jak zakończenie operacji we / wy, dostępność zasobu lub sygnał z innego procesu.
+---
+
+przejścia wyzwalające zmiany stanów:
+
+jądro systemu operacyjnego:
+Executing -> Ready : Gdy process trwa zbyt długo to jądro systemu może zmienić jego stan
+
+kod sterowników:
+Interruptible -> Running: Powiadomienie o dostępnym pakiecie przez kartę sieciową może zmienić stan procesu
+
+proces użytkownika:
+Running -> Stopped: Wysłanie sygnału zatrzymującego (np Ctrl+Z w terminalu lub kill -SIGTSTP <pid> wysłany przez proces) przez proces do innego procesu, przez co zmieni się jego stan
+
+
