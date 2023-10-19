@@ -1,0 +1,417 @@
+jądro Linuxa (inaczej niż inne systemu) reprezentuja procesy jako zadania - task_struct. Proces jednowatkowy jest reprezentowany jako jedno zadanie a wielo jako wiele.
+
+Dla każdego procesu składowany jest w pamięci deskryptor procesu służący do zarządania procesami przez jądro (struktura zadania opisuje stan procesu a deksryptor juz nie bardzo). Deskryptor jest tworzony w ramach instrukcji tworzącej sam proces.
+
+Jądro składuje deksryptory wszsytkich procesów na liscie dwukierunkowej. PID można odwzorować na address struktury zadania procesu z danym PIDem.
+
+struktura zadania (task_struct) zawiera:
+- info wykorzystywane przez planiste (czas na procesorze, wywłaszeń itd)
+- obraz pamięci - wskaźniki do segmentu tekstu, danych i stosu lub tablice stron (info gdzie znalexc skladniki skladowe na dysku)
+- info o sygnałach czyli maski itd.
+- rejestry maszynowe - w razie wykonywania przez jądro płapki tutaj zapisywany jest konstekst procesora
+- Stan wywołania systemowego ?
+- Tablica deskryptorów plików
+- Rozliczenia - też info o czasach
+- Stos jądra 
+- Różne
+
+
+
+
+
+
+
+
+
+
+
+
+zad 2
+
+Potok - jest rodzajem pseudopliku, który można wykorzystać do połączenia dwóch procesów. Jeśli procesy A i B chcą się ze sobą komunikować przez potok, muszą go wcześniej ustanowić. Kiedy proces A chce przesłać
+dane do procesu B, zapisuje informacje w potoku tak, jakby był on plikiem wynikowym. W rzeczywistości implementacja potoku bardzo przypomina implementację pliku. Proces B może
+czytać dane poprzez czytanie potoku w taki sposób, jakby był to plik wejściowy. Tak więc komunikacja między procesami w Uniksie wygląda bardzo podobnie do standardowych operacji odczytu
+i zapisu plików.
+
+
+RÓŻNICA W SYSTEMIE LINUX I WINNT
+Pod linuxem możemy stworzyć proces wywołując fork, co jest bardzo szybkie, bo jest to nadal ten sam kod, na dodatek pamięć jest inteligentnie współdzielona, czego nie ma pod Windowsem (WinNT - kernel)
+
+
+
+LINUX
+(
+- struktura zdania wraz z deskryptorem nowego i razem z nim stos jądra, strutura thread_info i jakies inne rzeczy. Struktury w większości wypełniane są na podstawie procesu macierzystego
+- Proces potomny otrzymuje identyfikator PID, własną mapę pamięci oraz współdzielony dostęp do plików swojego rodzica. Zaraz potem ustawia się rejestry nowego procesu
+- generalnie segmnet tekstu nie zostaje przepisany, zamaist tego jest wspoldzielony bo jest read-only ale tak na serio wszsytko jest wspoldzielone dopóty dopóki nowy proces nie bedzie chciał czegoś zmodyfikować. W takim wypadku tworzona jest kopia strony pmaięci dawana jest już z naeżytymi prawami dostępu nowu procesowi
+) 
+
+
+
+ fork i execv:                           	Z KSIAZKI
+-wywołanie przechodzi w tryb jądra
+
+-przydzelenie pamięci dla struktury zadania procesu potomnego
+-wypełnienie struktury zadania potomnego danymi procesu rodzica
+-przydzielenie pamięci dla stosu i przestrzeni użytkownika procesu potonego
+-przydzielenie PID 
+-Określenie że tekst ma by wspóldzielony
+-kopiuje tablice stron dla danych i stosu
+-określenie że otwarte pliki mają być współdzielone
+
+- następuję powrót do procesu ( w końcu też do dziecka)
+- wywolanie execv(nazwa polecenia, argumenty do niego, zmienne srodowiskowy/0)
+
+-wywołanie przechodzi w tryb jądra
+
+-odnajduje program wykonywalny
+-sprawdza uprawdenia
+-odczytuje i weryfukuje naglowek
+-kopiuje argumenty i lansuchy srodowiskowe do jadra
+-zwalnia stara prezstrzen adresowa (OBRAZ PAMIEC!!!!)
+-przydziela nowa (ORAZ PAMIECI!!!!)
+-kopiuje zmienne i lancuchy srodowiskowe na stos
+-zeruje sygnaly
+-inicjalizuje rejestry
+
+
+
+
+WinNT        niepotrzebne	
+
+- w trybie uzytkownika wywolywane jest CreateProcess  znazwa pliku
+- CreateProcess  gromadzi parametry do stworzenia procesu i przekazuje je NtCreateUserProcess, kotre wykonywane jest w trybie jadra
+- zostaje stworzony zupełnie nowy proces a nie kopia jak w linuxie.
+(Stworzony proces nie otrzymuje kopii pamięci swojego rodzica CreateProcess można w pewien sposób porównać do połączenia fork z execve.)
+
+Procesor CPU np. może być wyposażony w oddzielne jednostki do pobierania, dekodowania i uruchamiania instrukcji. Dzięki temu, kiedy procesor uruchamia instrukcję n, może w tym samym czasie dekodować instrukcję n+1 i pobierać instrukcję n+2. Taka organizacja nosi nazwę potoku.
+
+
+
+
+POTOKI I PRZEKIEROWANIA
+
+Chodzi o to, że aby stworzyć potok z procesm fork i jego dzieckiem wykonujący inny program przy pomocy execve należy odpowiednio zmienić dekskryptory plików. Ciezko to zrobic korzystajac ze spwan, bo zmiana powinna nastapic po skopiowaniu dekryptorow. Spwan nie daje pola do takiej zminy, jedyne co przychodzi mi do glowy to zmiana deskryptora przed spwan czyli w ogole przed stwrzeniem dziecka ale w takim wypadku wprowadzone zmiany zostana skopiowane co doprowadzi do bledow.
+Nie mozna zmienic deskryptorow po wywolaniu spawn, bo dziecko od razu zaczyna wykonywac inny program a to przeciez jemu chcelismy prezkazac dane.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+zad 1
+
+
+stan procesu - stan dzialania procesów, monitorowanie i zarządzanie działaniem procesów w systemie.
+
+zablokowanie sygnalu - zapalenie bitu w masce blokujacej sygnaly (chyba w deskryptorze prescesu) proces nie będzie reagował na sygnał danego typu, ale informacja o tym, że on nadszedł jest pamiętana i zostanie on obsłużony w momencie, gdy go odblokujemy
+
+zignorowanie sygnalu - oznacza, że proces nie reaguje na sygnał, nie obsługuje go w /proc/pid/status: SigIgn: Maska (wyrażone szesnastkowo) wskazująca ignorowanie sygnałów. 
+
+sen przerywalny - może być przerwany, co oznacza, że może reagować na sygnały i kontynuować swoje działanie. Stan ten jest oznaczany literą "S" - procesy w stanie przerywalnym często oczekują na zdarzenia wejścia/wyjścia, takie jak odczytanie danych z dysku twardego, pobranie danych z sieci.  Procesy w stanie przerywalnym są aktywne i mogą być wznowione po zakończeniu operacji wejścia/wyjścia lub po otrzymaniu odpowiedniego sygnału.
+
+sen nieprzerywalny - Procesy w stanie nieprzerywalnym zazwyczaj reprezentują operacje wejścia/wyjścia, które wymagają dostępu do urządzeń blokujących lub operacje związane z systemem plików, na przykład synchronizację metadanych na dysku. Jeśli taki proces napotka problem lub błąd, który utknął go w stanie nieprzerywalnym, może to prowadzić do konieczności restartowania systemu lub ręcznego zrestartowania procesu, co jest zazwyczaj ostatecznością. Proces w stanie nieprzerywalnym jest w stanie usypienia, ale nie może być przerwany przez standardowe sygnały, takie jak SIGINT (Ctrl+C) czy SIGTERM. Stan ten jest oznaczany literą "D" w wynikach polecenia ps
+
+
+
+The signals SIGKILL and SIGSTOP cannot be caught, blocked, or ignored - no wiec SIGSEGV mozna dotykac
+(po zignorowaniu SIGSEGV zapetlamy sie bo nie idziemy do nastenej istrukcji tylko do tej samej, a ona znowu wykonuje odwolanie do pamieci)
+ 
+
+
+
+STANY PROCESOW
+
+Running: ta wartość stanu odpowiada dwóm stanom. Uruchomiony proces jest w trakcie wykonywania (Executing) lub jest gotowy do wykonania (Ready).
+
+Interruptible: jest to stan zablokowany, w którym proces oczekuje na zdarzenie, takie jak zakończenie operacji we / wy, dostępność zasobu lub sygnał z innego procesu.
+
+Uninterruptible: jest to kolejny stan zablokowany. W stanie nieprzerywalnym proces oczekuje bezpośrednio na warunki sprzętowe i dlatego nie będzie obsługiwał żadnych sygnałów.
+
+Stopped: proces został zatrzymany i można go wznowić tylko poprzez pozytywne działanie innego procesu. Na przykład debugowany proces można ustawić w stan zatrzymania.
+
+Zombie: Proces został zakończony, ale z jakiegoś powodu nadal musi mieć strukturę zadań w tabeli procesów.
+
+
+
+
+przejścia wyzwalające zmiany stanów:
+
+jądro systemu operacyjnego:
+Executing -> Ready : Gdy process trwa zbyt długo to jądro systemu może zmienić jego stan
+
+kod sterowników:
+Interruptible -> Running: Powiadomienie o dostępnym pakiecie przez kartę sieciową może zmienić stan procesu
+
+proces użytkownika:
+Running -> Stopped: Wysłanie sygnału zatrzymującego (np Ctrl+Z w terminalu lub kill -SIGTSTP <pid> wysłany przez proces) przez proces do innego procesu, przez co zmieni się jego stan
+
+
+
+
+
+
+
+zad 3
+
+
+FORK	- inheritance
+
+- Real and effective user and group IDs
+- Environment settings - USER, LOGNAME (The name of the logged-in user), 
+	HOME (A user's login directory - the home directory),  
+	LANG - the name of a locale to use for locale categories when not overridden by LC_ALL
+	PATH - The sequence of directory prefixes that programs apply in searching for a file 
+            with incomplete pathname.
+	PWD - The current working directory.
+	TERM - The terminal type for which output is to be prepared.
+- Signal handling settings - signal handlers
+- Attached shared memory segments - A shared memory is an extra piece of memory 
+    that is attached to some address spaces for their owners to use. 
+    As a result, all of these processes have access to it. (process descriptor??)
+- Memory mapped segments -  segment of the virtual memory of a process, 
+    where a file or file-like resource is loaded into.
+- Process group ID
+- Current working directory
+- File mode creation mask
+- Controlling terminal
+
+	- difference
+
+- child has unique PID
+- different PPID od parenta
+- has its own copy of the parent's file descriptors (with parents entries)
+- has its own copy of the parent's open directory streams
+- set of signals pending for the child process is cleared.
+
+
+
+
+EVECVE 
+
+- File descriptors open in the calling process image remain open in the new process
+- Signals set to the default action (SIG_DFL) in the calling process image are set to
+	the default action in the new process image. Signals set to be ignored (SIG_IGN) 
+	by the calling process image are set to be ignored by the new process image. 
+	Signals set to be caught in the calling process image are set to 
+	the default action in the new process image.
+- Shared memory or memory mapped segments attached to the calling process 
+	are NOT attached to the new process image.
+	
+	- inheritance 
+
+- PID
+- PPID
+- PGID
+- Session membership - processes are organized into sets of sessions. 
+	The session's ID is the same as the pid of the process that created the session
+	through the setsid() system call.
+- Real user id
+- Real group id
+- Time left until an alarm clock signal
+- Current working directory
+- Process signal mask - the collection of signals that are currently blocked is called the signal mask
+- Pending signals
+- Process execution times, as returned by times()
+- Controlling terminal
+
+
+
+
+Czemu przed wywołaniem fork należy opróżnić bufory biblioteki stdio(3)?
+
+When you fork the process in, the child processes inherits every part of the parent process, including the unflushed output buffer. This effectively copies the unflushed buffer to each child process. So each child process would read the same buffer. It is good practice to call fflush() on all streams with pending output before calling fork() or to let the forked child call explicitly _exit() that only exits the process without flushing the stdio streams.
+
+
+
+Co jądro robi w trakcie wywołania execve z konfiguracją zainstalowanych procedur obsługi sygnałów?
+
+Przywraca standardowa obsługę tylko tych sygnałów, dla których ustawiono wcześniej nowa procedure obslugi. Sygnały, które były ignorowane w programie wywołującym, pozostaną takimi w programie wywoływanym
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+zad 4
+
+kill function deafult signal is SIGTERM	
+
+SigQ   This  field contains two slash-separated numbers that relate to queued signals for
+                     the real user ID of this process.  The first of these is the number  of  currently
+                     queued  signals for this real user ID, and the second is the resource limit on the
+                     number of queued signals for this process (see the description of  RLIMIT_SIGPEND‐
+                     ING in getrlimit(2)).
+
+SigPnd, ShdPnd
+                     Mask (expressed in hexadecimal) of signals pending for thread and for process as a
+                     whole (see pthreads(7) and signal(7)).o
+	
+
+SigBlk, SigIgn, SigCgt
+                     Masks (expressed in hexadecimal) indicating signals being  blocked,  ignored,  and
+                     caught (see signal(7)).
+
+
+SigQ:	0/60892
+SigPnd:	0000000000000000
+ShdPnd:	0000000000000000
+SigBlk:	0000000000010000
+SigIgn:	0000000000384004
+SigCgt:	000000004b813efb
+
+uruchamiam xeyes, sprawdzam jego pida ps -ef | grep "xeyes" i generalnie wysylam sygnal kill -18 <jego pid> (to jest SIGTSTP)
+otwiram goscia cat /proc/<pid>/status wysylam inne sygnaly i sprawdzam jak sie kolejkuja
+
+
+kolejnosc dostarczenia sygnalow pokazana jest w indexach - kill -L
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+zad 5
+
+
+
+#include <sys/types.h>
+#include <sys/wait.h>
+
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#define LEN(x)	(sizeof (x) / sizeof *(x))
+#define TIMEO	30
+
+static void sigpoweroff(void);
+static void sigreap(void);
+static void sigreboot(void);
+static void spawn(char *const []);
+
+static struct {
+	int sig;
+	void (*handler)(void);
+} sigmap[] = {
+	{ SIGUSR1, sigpoweroff },
+	{ SIGCHLD, sigreap     },
+	{ SIGALRM, sigreap     },
+	{ SIGINT,  sigreboot   },
+};
+
+#include "config.h"
+
+static sigset_t set;
+
+int
+main(void)
+{
+	int sig;
+	size_t i;
+
+	if (getpid() != 1)
+		return 1;
+	chdir("/");
+	sigfillset(&set);
+	sigprocmask(SIG_BLOCK, &set, NULL);
+	spawn(rcinitcmd);
+	while (1) {
+		alarm(TIMEO);
+		sigwait(&set, &sig);
+		for (i = 0; i < LEN(sigmap); i++) {
+			if (sigmap[i].sig == sig) {
+				sigmap[i].handler();
+				break;
+			}
+		}
+	}
+	/* not reachable */
+	return 0;
+}
+
+static void
+sigpoweroff(void)
+{
+	spawn(rcpoweroffcmd);
+}
+
+static void
+sigreap(void)
+{
+	while (waitpid(-1, NULL, WNOHANG) > 0)
+		;
+	alarm(TIMEO);
+}
+
+static void
+sigreboot(void)
+{
+	spawn(rcrebootcmd);
+}
+
+static void
+spawn(char *const argv[])
+{
+	switch (fork()) {
+	case 0:
+		sigprocmask(SIG_UNBLOCK, &set, NULL);
+		setsid();
+		execvp(argv[0], argv);
+		perror("execvp");
+		_exit(1);
+	case -1:
+		perror("fork");
+	}
+}
+
+
+Minimalny program rozruchowy dostaje sie do katalogu glownego "chdir("/")", podnosi wszsytkie bity we wczesniej zinicjalizowanej masce sygnałłów (dzieki temu zedan sygnal poza dwoma nie zmieni pracy processu)
+Nastepnie poleceniem sigprocmask i argumentami SIG_BLOCK, &set, NULL ustawia wczesniej zbudowaną maskę jako już faktyczą prawdziwą z krwi i kości.
+Wywołuje funckję init, po czym czuwa czy są wysyłane sygnały zawarte w masce set. Gdy taki sygnał zostanie odbrany jego nr zapisze zmienna sig. Jezeli przez 30s process nie otrzyma zadnego sygnalu z set to otrzyma sygnal wygenerowany przez alarm(), co spowoduje obsluzenie sigreap widac wszystko nie ma co pisac
+
+
+sigwait(&set, &sig) jest używana w języku C w systemach Unixowych do synchronicznej oczekiwanie na sygnał z określonej maski sygnałów set. Oznacza to, że program zostanie zatrzymany (zawieszony) do momentu odebrania jednego z sygnałów wskazanych w masce set. Gdy taki sygnał zostanie odebrany, jego numer sygnału zostanie zapisany do zmiennej sig, a program będzie kontynuowany.
+
+sigprocmask(SIG_BLOCK, &set, NULL); jest używane w języku C w systemach Unixowych, aby nadac realne znaczenie sygnałom określone w masce sygnałów set (znacznenie u nas  to SIG_BLOCK)A jak grzebie dzieci no tez widac czeka sobie na sygnal, gdy mija czas obluhuje SIGALRM i robi waitpid-a, gdy juz pogrzebie albo niczego do pogrzebania nie bedzie to wlacza timer i wraca do while-a w ciele main-a
+
+A jak grzebie dzieci no tez widac czeka sobie na sygnal, gdy mija czas obsluguje SIGALRM i robi waitpid-a, gdy juz pogrzebie albo niczego do pogrzebania nie bedzie to wlacza timer i wraca do while-a w ciele main-a
+
+jak reaguje na sygnaly z maski?
+SIGINT - uruchamia system od nowa
+SIGCHLD i SIGALRM - jezeli moze to grzebie, ustawia timer i wraca do instrukcji + 1 sprzed sygnału
+SIGUSR1 - wylacza sysytem
+
+
